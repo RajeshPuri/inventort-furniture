@@ -1,0 +1,112 @@
+{
+  "entities": {
+    "Material": {
+      "title": "Material",
+      "description": "Raw materials used in furniture production",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "unit": { "type": "string", "enum": ["sq ft", "kg", "m", "pcs"] },
+        "stockLevel": { "type": "number" },
+        "costPerUnit": { "type": "number" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "unit", "stockLevel", "costPerUnit"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Finished furniture items",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "sku": { "type": "string" },
+        "recipe": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "materialId": { "type": "string" },
+              "quantity": { "type": "number" }
+            }
+          }
+        },
+        "laborBuffer": { "type": "number", "description": "Percentage buffer for labor/overhead" },
+        "stockLevel": { "type": "number" },
+        "price": { "type": "number" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "sku", "category", "stockLevel", "price"]
+    },
+    "ProductionOrder": {
+      "title": "Production Order",
+      "description": "Tracks the manufacturing process for a product",
+      "type": "object",
+      "properties": {
+        "productId": { "type": "string" },
+        "quantity": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "cutting", "assembly", "finished"] },
+        "artisanId": { "type": "string" },
+        "estimatedCompletion": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["productId", "quantity", "status"]
+    },
+    "Invoice": {
+      "title": "Invoice",
+      "description": "Retail sales record",
+      "type": "object",
+      "properties": {
+        "customerName": { "type": "string" },
+        "customerEmail": { "type": "string" },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "productId": { "type": "string" },
+              "quantity": { "type": "number" },
+              "price": { "type": "number" }
+            }
+          }
+        },
+        "subtotal": { "type": "number" },
+        "tax": { "type": "number" },
+        "total": { "type": "number" },
+        "status": { "type": "string", "enum": ["paid", "pending"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["customerName", "items", "total", "status"]
+    }
+  },
+  "firestore": {
+    "/materials/{materialId}": {
+      "schema": "Material",
+      "description": "Raw material stocks"
+    },
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Finished goods inventory"
+    },
+    "/productionOrders/{orderId}": {
+      "schema": "ProductionOrder",
+      "description": "Active and completed production orders"
+    },
+    "/invoices/{invoiceId}": {
+      "schema": "Invoice",
+      "description": "Retail transaction records"
+    },
+    "/users/{userId}": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "email": { "type": "string" },
+          "role": { "type": "string", "enum": ["admin", "artisan", "showroom"] }
+        }
+      },
+      "description": "System users and roles"
+    }
+  }
+}

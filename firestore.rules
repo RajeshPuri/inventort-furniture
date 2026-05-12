@@ -1,0 +1,109 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function hasRole(role) {
+      return isSignedIn() && getUserData().role == role;
+    }
+
+    function isAdmin() {
+      return hasRole('admin');
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // 1. Materials
+    match /materials/{materialId} {
+      function isValidMaterial(data) {
+        return data.keys().hasAll(['name', 'unit', 'stockLevel', 'costPerUnit']) &&
+               data.name is string && data.name.size() <= 100 &&
+               data.unit in ['sq ft', 'kg', 'm', 'pcs'] &&
+               data.stockLevel is number &&
+               data.costPerUnit is number;
+      }
+
+      allow read: if isSignedIn();
+      allow create: if isAdmin() && isValidMaterial(request.resource.data);
+      allow update: if isSignedIn() && (
+        isAdmin() || 
+        (hasRole('artisan') && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stockLevel', 'updatedAt']))
+      );
+      allow delete: if isAdmin();
+    }
+
+    // 2. Products
+    match /products/{productId} {
+      function isValidProduct(data) {
+        return data.keys().hasAll(['name', 'sku', 'category', 'stockLevel', 'price']) &&
+               data.name is string && data.name.size() <= 100 &&
+               data.sku is string && data.sku.size() <= 50 &&
+               data.price is number &&
+               data.stockLevel is number;
+      }
+
+      allow read: if isSignedIn();
+      allow create: if isAdmin() && isValidProduct(request.resource.data);
+      allow update: if isSignedIn() && (
+        isAdmin() ||
+        (hasRole('showroom') && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stockLevel', 'updatedAt']))
+      );
+      allow delete: if isAdmin();
+    }
+
+    // 3. Production Orders
+    match /productionOrders/{orderId} {
+      function isValidOrder(data) {
+        return data.keys().hasAll(['productId', 'quantity', 'status']) &&
+               data.productId is string &&
+               data.quantity is number &&
+               data.status in ['pending', 'cutting', 'assembly', 'finished'];
+      }
+
+      allow read: if isSignedIn();
+      allow create: if isAdmin() || hasRole('artisan');
+      allow update: if isSignedIn() && (
+        isAdmin() ||
+        (hasRole('artisan') && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']))
+      );
+    }
+
+    // 4. Invoices
+    match /invoices/{invoiceId} {
+      function isValidInvoice(data) {
+        return data.keys().hasAll(['customerName', 'items', 'total', 'status']) &&
+               data.customerName is string &&
+               data.items is list &&
+               data.total is number &&
+               data.status in ['paid', 'pending'];
+      }
+
+      allow read: if isSignedIn() && (isAdmin() || hasRole('showroom') || resource.data.userId == request.auth.uid);
+      allow create: if isSignedIn() && (isAdmin() || hasRole('showroom'));
+    }
+
+    // 5. Users
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || request.auth.uid == userId;
+    }
+  }
+}
